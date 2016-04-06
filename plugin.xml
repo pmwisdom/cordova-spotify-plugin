@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<plugin xmlns="http://apache.org/cordova/ns/plugins/1.0" xmlns:android="http://schemas.android.com/apk/res/android" id="com.pmwisdom.spotify" version="0.1.0">
+  <name>Spotify Cordova Android</name>
+  <description>A Native Spotify Plugin For Auth / Playback for android</description>
+  <author>Paul Wisdom</author>
+  <license>MIT</license>
+  <keywords>spotify</keywords>
+  <repo></repo>
+  <issue></issue>
+
+  <engines>
+    <engine name="cordova" version=">=3.7.0" />
+  </engines>
+
+  <js-module name="auth" src="www/auth.js">
+    <merges target="plugins.spotify" />
+  </js-module>
+  <!--<js-module name="request" src="www/spotify/request.js">-->
+    <!--<merges target="spotify" />-->
+  <!--</js-module>-->
+  <js-module name="audio-player" src="www/audio-player.js">
+    <merges target="plugins.spotify" />
+  </js-module>
+
+  <!--<js-module name="remote" src="www/lib/remote.js">-->
+  <!--</js-module>-->
+  <!--<js-module name="utils" src="www/lib/utils.js">-->
+  <!--</js-module>-->
+  <!--<js-module name="event-dispatcher" src="www/lib/event-dispatcher.js">-->
+  <!--</js-module>-->
+
+  <!--<js-module name="vendors/reqwest" src="www/vendors/reqwest/reqwest.min.js">-->
+  <!--</js-module>-->
+
+  <platform name="android">
+    <preference name="CLIENT_ID_ANDROID" />
+    <preference name="REDIRECT_URI_ANDROID" />
+
+    <config-file target="AndroidManifest.xml" parent="/manifest/application/activity/intent-filter">
+      <category android:name="com.spotify.sdk.android.authentication.LoginActivity" />
+      <data android:scheme="$REDIRECT_URI_ANDROID" android:host="callback"/>
+    </config-file>
+
+    <config-file target="AndroidManifest.xml" parent="/manifest/application">
+      <activity android:name="com.spotify.sdk.android.authentication.LoginActivity"
+                android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+    </config-file>
+
+
+    <config-file target="res/xml/config.xml" parent="/*">
+      <feature name="CDVSpotify" >
+        <param name="android-package" value="com.pmwisdom.spotify.CDVSpotify"/>
+      </feature>
+    </config-file>
+
+    <source-file src="res/android/values/spotify.xml" target-dir="res/values" />
+    <config-file target="res/values/spotify.xml" parent="/*">
+      <string name="client_id">$CLIENT_ID_ANDROID</string>
+      <string name="redirect_uri">$REDIRECT_URI_ANDROID</string>
+    </config-file>
+
+
+    <source-file src="src/android/CDVSpotify.java" target-dir="src/com/pmwisdom/spotify"/>
+
+    <framework src="src/android/spotify.gradle" custom="true" type="gradleReference" />
+
+    <resource-file src="libs/android/spotify-auth-1.0.0-beta12.aar" target="libs/spotify/spotify-auth-1.0.0-beta12.aar" />
+    <resource-file src="libs/android/spotify-player-1.0.0-beta12.aar" target="libs/spotify/spotify-player-1.0.0-beta12.aar" />
+
+  </platform>
+</plugin>
