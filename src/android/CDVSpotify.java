@@ -10,6 +10,7 @@ import org.apache.cordova.CordovaPlugin;
 import org.apache.cordova.CordovaWebView;
 import org.json.JSONArray;
 import org.json.JSONException;
+import org.json.JSONObject;
 
 import com.spotify.sdk.android.authentication.AuthenticationClient;
 import com.spotify.sdk.android.authentication.AuthenticationRequest;
@@ -21,6 +22,8 @@ import com.spotify.sdk.android.player.ConnectionStateCallback;
 import com.spotify.sdk.android.player.Player;
 import com.spotify.sdk.android.player.PlayerNotificationCallback;
 import com.spotify.sdk.android.player.PlayerState;
+
+import java.net.URL;
 
 /**
  * Created by Paul on 4/4/2016.
@@ -36,10 +39,8 @@ public class CDVSpotify extends CordovaPlugin implements
 
     private static final int REQUEST_CODE = 1337;
 
-    // TODO: Replace with your client ID
     private String clientId;
-    // TODO: Replace with your redirect URI
-    private String redirectUri = "com.pmwisdom.spotify.AuthCallback://callback";
+    private String redirectUri;
 
 
     private CallbackContext loginCallback;
@@ -74,9 +75,19 @@ public class CDVSpotify extends CordovaPlugin implements
 
         if(ACTION_LOGIN.equalsIgnoreCase(action)) {
             Log.i(TAG, "LOGIN");
+            JSONArray scopes = new JSONArray();
+            Boolean fetchTokenManually = false;
 
-            this.login();
+            try {
+                scopes = data.getJSONArray(0);
+                fetchTokenManually = data.getBoolean(1);
+            } catch(JSONException e) {
+                Log.e(TAG, e.toString());
+            }
+
+            cordova.setActivityResultCallback(this);
             loginCallback = callbackContext;
+            this.login(scopes, fetchTokenManually);
             success = true;
         } else if(ACTION_PLAY.equalsIgnoreCase(action)) {
             String uri = "";
@@ -101,20 +112,50 @@ public class CDVSpotify extends CordovaPlugin implements
         return success;
     }
 
-    private void login() {
+    //scopes -- self exaplanatory
+    //manualMode -- If you set manualMode = true, the login process will generate a CODE instead of a TOKEN, so you can manually refresh and obtain a refresh
+    //token. AGAIN : YOU MUST OBTAIN A ACCESS TOKEN MANUALLY IF you SET THiS TO TRUE
+    private void login(JSONArray scopes, Boolean fetchTokenManually) {
+        AuthenticationResponse.Type authType = fetchTokenManually ? AuthenticationResponse.Type.CODE :AuthenticationResponse.Type.TOKEN;
+
+
         AuthenticationRequest.Builder builder = new AuthenticationRequest.Builder(clientId,
-                AuthenticationResponse.Type.TOKEN,
+                authType,
                 redirectUri);
         builder.setScopes(new String[]{"user-read-private", "streaming"});
+        builder.setShowDialog(true);
         AuthenticationRequest request = builder.build();
 
-        Log.d(TAG, "Client ID " + clientId + "AUTH RESPONSE TYPE " + AuthenticationResponse.Type.TOKEN + "REDIRECT URI " +  redirectUri);
+        Log.d(TAG, "Client ID " + clientId + "AUTH RESPONSE TYPE " + AuthenticationResponse.Type.TOKEN + "REDIRECT URI " + redirectUri + " Scopes " + scopes + " manual " + fetchTokenManually);
 
         AuthenticationClient.openLoginActivity(cordova.getActivity(), REQUEST_CODE, request);
     }
 
+    private void logout() {
+        AuthenticationClient.clearCookies(cordova.getActivity());
+
+        this.clearPlayerState();
+        isLoggedIn = false;
+        currentAccessToken = null;
+    }
+
+    private void clearPlayerState() {
+        if(currentPlayer != null) {
+            currentPlayer.pause();
+            currentPlayer.logout();
+        }
+
+        currentPlayer = null;
+    }
+
     private void play(String uri) {
+        Log.i(TAG, "Play: Is logged in -" + isLoggedIn + "Current Access" + currentAccessToken + "Current player" + currentPlayer);
         if(clientId == null || isLoggedIn == false || currentAccessToken == null || currentPlayer == null) return;
+
+        if(currentPlayer.isLoggedIn()) {
+            Log.e(TAG, "Current Player is initialized but player is not logged in, set access token manually or call login with fetchTokenManually : false");
+            return;
+        }
 
         Log.i(TAG, "Playing URI: " + uri);
 
@@ -148,6 +189,8 @@ public class CDVSpotify extends CordovaPlugin implements
         Log.i(TAG, "Request Code " + requestCode);
         Log.i(TAG, "Result Code " + resultCode);
 
+        JSONObject ret = new JSONObject();
+
         // Check if result comes from the correct activity
         if (requestCode == REQUEST_CODE) {
             AuthenticationResponse response = AuthenticationClient.getResponse(resultCode, intent);
@@ -155,29 +198,53 @@ public class CDVSpotify extends CordovaPlugin implements
                 case TOKEN :
                     isLoggedIn = true;
                     Log.i(TAG, "TOKEN " + response.getAccessToken() );
+
+                    try {
+                        ret.put("authToken", response.getAccessToken());
+                    } catch(JSONException e) {
+                        Log.e(TAG, e.getMessage());
+                    }
+
                     currentAccessToken = response.getAccessToken();
-                    loginCallback.success(response.getAccessToken());
 
-                    Config playerConfig = new Config(cordova.getActivity(), currentAccessToken, clientId);
+                    loginCallback.success(ret);
+                    loginCallback = null;
+                    break;
+                case CODE :
+                    isLoggedIn = false;
+                    Log.i(TAG, "RECEIVED CODE" + response.getCode());
 
-                    Spotify.getPlayer(playerConfig, this, new Player.InitializationObserver() {
-                        @Override
-                        public void onInitialized(Player player) {
-                            currentPlayer = player;
-                        }
+                    try {
+                        ret.put("authCode", response.getCode());
+                    } catch(JSONException e) {
+                        Log.e(TAG, e.getMessage());
+                    }
 
-                        @Override
-                        public void onError(Throwable throwable) {
-                            Log.e("MainActivity", "Could not initialize player: " + throwable.getMessage());
-                        }
-                    });
-
+                    loginCallback.success(ret);
+                    loginCallback = null;
                     break;
                 case ERROR :
                     Log.e(TAG, response.getError());
                     loginCallback.error(response.getError());
                     break;
             }
+        }
+
+        if(isLoggedIn) {
+            Config playerConfig = new Config(cordova.getActivity(), currentAccessToken, clientId);
+
+            Spotify.getPlayer(playerConfig, this, new Player.InitializationObserver() {
+                @Override
+                public void onInitialized(Player player) {
+                    Log.i(TAG, "Player Initialized");
+                    currentPlayer = player;
+                }
+
+                @Override
+                public void onError(Throwable throwable) {
+                    Log.e("MainActivity", "Could not initialize player: " + throwable.getMessage());
+                }
+            });
         }
     }
 
