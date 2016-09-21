@@ -21,7 +21,10 @@ var Spotify = window.plugins.spotify;
 Login : 
 ````
 //Log in natively
-Spotify.login();
+var options = {
+  scops: []
+};
+Spotify.login(options, success, failure);
 ````
 
 Play : 
