@@ -22,8 +22,9 @@ Login :
 ````
 //Log in natively
 var options = {
-  scops: []
+  scopes: []
 };
+
 Spotify.login(options, success, failure);
 ````
 
