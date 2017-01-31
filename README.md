@@ -1,6 +1,9 @@
 # cordova-spotify-plugin
 Cordova Spotify Integration for Android [Simple API]
 
+## NOTE: I am not currently working on this, nor do I plan to in the future. I've put this here so anyone that wants to continue my work can. If you have a problem with the plugin you're on your own. I will accept PR's. 
+
+
 NOTE: ANDROID ONLY (for now)
 I wanted a really simple way to A) login to spotify natively and B) play / pause / resume natively. There is another IOS plugin but I felt the api was too complicate for my uses. 
 
